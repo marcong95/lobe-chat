@@ -1,11 +1,11 @@
 'use client';
 
-import { DiffAction, IEditor, LITEXML_DIFFNODE_ALL_COMMAND, useHasDiffNode } from '@lobehub/editor';
+import { DiffAction, IEditor, LITEXML_DIFFNODE_ALL_COMMAND } from '@lobehub/editor';
 import { Block, Icon } from '@lobehub/ui';
 import { Button, Space } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { Check, X } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useIsDark } from '@/hooks/useIsDark';
@@ -35,11 +35,70 @@ const styles = createStaticStyles(({ css }) => ({
   `,
 }));
 
+const useIsEditorInit = (editor: IEditor) => {
+  const [isEditInit, setEditInit] = useState<boolean>(!!editor?.getLexicalEditor());
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const onInit = () => {
+      setEditInit(true);
+    };
+    editor.on('initialized', onInit);
+    return () => {
+      editor.off('initialized', onInit);
+    };
+  }, [editor]);
+
+  return isEditInit;
+};
+
+const useEditorHasPendingDiffs = (editor: IEditor) => {
+  const [hasPendingDiffs, setHasPendingDiffs] = useState(false);
+  const isEditInit = useIsEditorInit(editor);
+
+  // Listen to editor state changes to detect diff nodes
+  useEffect(() => {
+    if (!editor) return;
+
+    const lexicalEditor = editor.getLexicalEditor();
+
+    if (!lexicalEditor || !isEditInit) return;
+
+    const checkForDiffNodes = () => {
+      const editorState = lexicalEditor.getEditorState();
+      editorState.read(() => {
+        // Get all nodes and check if any is a diff node
+        const nodeMap = editorState._nodeMap;
+        let hasDiffs = false;
+        nodeMap.forEach((node) => {
+          if (node.getType() === 'diff') {
+            hasDiffs = true;
+          }
+        });
+        setHasPendingDiffs(hasDiffs);
+      });
+    };
+
+    // Check initially
+    checkForDiffNodes();
+
+    const unregister = lexicalEditor.registerUpdateListener(() => {
+      checkForDiffNodes();
+    });
+    // Register update listener
+    return () => {
+      unregister();
+    };
+  }, [editor, isEditInit]);
+
+  return hasPendingDiffs;
+};
+
 interface DiffAllToolbarProps {
   documentId: string;
   editor: IEditor;
 }
-
 const DiffAllToolbar = memo<DiffAllToolbarProps>(({ documentId }) => {
   const { t } = useTranslation('editor');
   const isDarkMode = useIsDark();
@@ -49,7 +108,7 @@ const DiffAllToolbar = memo<DiffAllToolbarProps>(({ documentId }) => {
     s.markDirty,
   ]);
 
-  const { hasDiff: hasPendingDiffs } = useHasDiffNode(editor);
+  const hasPendingDiffs = useEditorHasPendingDiffs(editor);
 
   if (!hasPendingDiffs) return null;
 
