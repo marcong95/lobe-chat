@@ -141,10 +141,11 @@ export const createEditorSlice: StateCreator<
       typeof doc.editorData === 'object' &&
       Object.keys(doc.editorData).length > 0;
 
+    console.log('hasValidEditorData', hasValidEditorData, doc);
     // Set content from document state
     if (hasValidEditorData) {
       try {
-        editor.setDocument('json', JSON.stringify(doc.editorData));
+        editor.setDocument('json', doc.editorData);
         return;
       } catch {
         // Fallback to markdown if JSON fails
