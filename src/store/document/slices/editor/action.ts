@@ -129,9 +129,11 @@ export const createEditorSlice: StateCreator<
   onEditorInit: async (editor) => {
     const { activeDocumentId, documents } = get();
     console.log('[DocumentStore] Initialize editor:', editor.getLexicalEditor()?._key);
+    console.log('[DocumentStore] activeDocumentId:', activeDocumentId);
     if (!editor || !activeDocumentId) return;
 
     const doc = documents[activeDocumentId];
+    console.log('[DocumentStore] doc:', doc);
 
     if (!doc) return;
 
@@ -142,26 +144,31 @@ export const createEditorSlice: StateCreator<
       Object.keys(doc.editorData).length > 0;
 
     console.log('hasValidEditorData', hasValidEditorData, doc);
-    // Set content from document state
-    if (hasValidEditorData) {
-      try {
-        editor.setDocument('json', doc.editorData);
-        return;
-      } catch {
-        // Fallback to markdown if JSON fails
-        console.warn('[DocumentStore] Failed to load editorData, falling back to markdown');
-      }
-    }
 
-    // Load markdown content if available
-    // Skip setDocument for empty content - let editor use its default empty state
-    if (doc.content?.trim()) {
-      try {
-        editor.setDocument('markdown', doc.content);
-      } catch (err) {
-        console.error('[DocumentStore] Failed to load markdown content:', err);
+    // Use queueMicrotask to defer setDocument call, avoiding flushSync during React render
+    queueMicrotask(() => {
+      // Set content from document state
+      if (hasValidEditorData) {
+        try {
+          editor.setDocument('json', doc.editorData);
+          return;
+        } catch (e) {
+          // Fallback to markdown if JSON fails
+          console.error('[DocumentStore] Failed to load editorData, falling back to markdown', e);
+        }
       }
-    }
+
+      // Load markdown content if available
+      // Skip setDocument for empty content - let editor use its default empty state
+      if (doc.content?.trim()) {
+        console.log(doc.content);
+        try {
+          editor.setDocument('markdown', doc.content);
+        } catch (err) {
+          console.error('[DocumentStore] Failed to load markdown content:', err);
+        }
+      }
+    });
 
     set({ editor });
   },
