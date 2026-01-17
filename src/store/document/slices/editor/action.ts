@@ -128,6 +128,7 @@ export const createEditorSlice: StateCreator<
 
   onEditorInit: async (editor) => {
     const { activeDocumentId, documents } = get();
+    console.log('[DocumentStore] Initialize editor:', editor.getLexicalEditor()?._key);
     if (!editor || !activeDocumentId) return;
 
     const doc = documents[activeDocumentId];
